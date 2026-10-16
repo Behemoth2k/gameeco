@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eco Blaster - Toàn Màn Hình & Nút Shop</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 50%, #2E8B57 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            color: #333;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: linear-gradient(180deg, #87CEEB 0%, #E0F7FA 40%, #A5D6A7 70%, #4CAF50 100%);
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .stat {
+            background: rgba(255,255,255,0.9);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            pointer-events: auto;
+        }
+        #score { color: #2E7D32; }
+        #lives { color: #C62828; font-size: 14px; }
+        #level { color: #1565C0; }
+        #coins { color: #F57F17; }
+        
+        #shop-btn-toggle {
+            background: linear-gradient(135deg, #FF9800, #EF6C00);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        #shop-btn-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(255,152,0,0.5);
+        }
+
+        #skill-bar {
+            position: absolute;
+            top: 75px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+            pointer-events: auto;
+        }
+        .skill-slot {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #4CAF50;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .skill-slot:hover {
+            background: rgba(76, 175, 80, 0.4);
+        }
+
+        #start-screen, #gameover-screen, #shop-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 20;
+            text-align: center;
+            padding: 20px;
+        }
+        #start-screen h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #4CAF50;
+            text-shadow: 0 0 20px rgba(76,175,80,0.6);
+        }
+        #start-screen h2 {
+            font-size: 22px;
+            margin-bottom: 20px;
+            color: #81C784;
+        }
+        #start-screen p, #gameover-screen p {
+            font-size: 16px;
+            max-width: 500px;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            color: #E8F5E9;
+        }
+        .btn {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+            border: none;
+            padding: 14px 36px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(76,175,80,0.4);
+        }
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(76,175,80,0.6);
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #FF9800, #EF6C00);
+            box-shadow: 0 4px 15px rgba(255,152,0,0.4);
+            margin-left: 10px;
+        }
+        
+        #shop-screen {
+            display: none;
+            justify-content: flex-start;
+            padding-top: 40px;
+            overflow-y: auto;
+        }
+        #shop-screen h2 {
+            color: #FFD54F;
+            margin-bottom: 15px;
+            font-size: 32px;
+        }
+        .shop-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 800px;
+            width: 100%;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .shop-section {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .shop-section h3 {
+            font-size: 18px;
+            color: #81C784;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 6px;
+        }
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .shop-item button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .shop-item button:hover {
+            background: #388E3C;
+        }
+        .shop-item button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        #gameover-screen h1 {
+            font-size: 40px;
+            color: #FF7043;
+            margin-bottom: 10px;
+        }
+        #final-score {
+            font-size: 26px;
+            color: #FFD54F;
+            margin: 10px 0;
+        }
+        .tip {
+            background: rgba(255,255,255,0.1);
+            padding: 12px 18px;
+            border-radius: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+            border-left: 4px solid #4CAF50;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 13px;
+            color: rgba(255,255,255,0.85);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+        #message {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            font-weight: bold;
+            color: #FFF;
+            text-shadow: 0 0 12px #4CAF50;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 15;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        
+        <div id="ui">
+            <div style="display: flex; gap: 10px; pointer-events: auto;">
+                <div class="stat" id="score">Điểm: 0</div>
+                <div class="stat" id="coins">🪙 0</div>
+                <div class="stat" id="level">Cấp: 1</div>
+            </div>
+            <div style="display: flex; gap: 10px; pointer-events: auto; align-items: center;">
+                <button class="stat" id="shop-btn-toggle" onclick="openShop()">🛒 Shop (B)</button>
+                <div class="stat" id="lives">Mạng: ❤️ 10/10</div>
+            </div>
+        </div>
+
+        <div id="skill-bar">
+            <div class="skill-slot" id="skill-shield" onclick="useSkill('shield')">🛡️ Lá Chắn (J)<br><span id="cd-shield">Sẵn sàng</span></div>
+            <div class="skill-slot" id="skill-bomb" onclick="useSkill('bomb')">💥 Sóng Rác (K)<br><span id="cd-bomb">Sẵn sàng</span></div>
+        </div>
+        
+        <div id="controls">← → hoặc A/D: Di chuyển | SPACE: Bắn | J, K: Kỹ năng | B: Mở Shop | P: Tạm dừng</div>
+        
+        <div id="message"></div>
+        
+        <!-- MÀN HÌNH BẮT ĐẦU -->
+        <div id="start-screen">
+            <h1>🌍 ECO BLASTER</h1>
+            <h2>Bắn Rác - Bảo Vệ Môi Trường</h2>
+            <p>Bấm vào nút 🛒 Shop ở góc trên hoặc phím **B** bất cứ lúc nào để mua sắm nâng cấp!</p>
+            <button class="btn" onclick="startGame()">BẮT ĐẦU CHƠI</button>
+        </div>
+
+        <!-- CỬA HÀNG SHOP -->
+        <div id="shop-screen">
+            <h2>🛒 CỬA HÀNG NÂNG CẤP</h2>
+            <p style="margin-bottom: 15px;">Xu hiện có: <span id="shop-coins" style="color: #FFD54F; font-weight:bold;">0</span> 🪙</p>
+            
+            <div class="shop-container">
+                <!-- Nâng cấp chỉ số -->
+                <div class="shop-section">
+                    <h3>⚡ Nâng Cấp Chỉ Số</h3>
+                    <div class="shop-item">
+                        <span>Tốc độ đạn (Cấp <span id="lvl-firespeed">1</span>)</span>
+                        <button onclick="buyUpgrade('fireSpeed')" id="btn-firespeed">Mua (50 🪙)</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Tốc độ di chuyển (Cấp <span id="lvl-speed">1</span>)</span>
+                        <button onclick="buyUpgrade('speed')" id="btn-speed">Mua (40 🪙)</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Hồi +1 Mạng tối đa</span>
+                        <button onclick="buyUpgrade('life')" id="btn-life">Mua (80 🪙)</button>
+                    </div>
+                </div>
+
+                <!-- Súng & Skin -->
+                <div class="shop-section">
+                    <h3>🔫 Skin & Súng Mới</h3>
+                    <div class="shop-item">
+                        <span>Plasma Xanh (Đạn kép)</span>
+                        <button onclick="buySkin('plasma', 150)" id="btn-skin-plasma">150 🪙</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Pháo Quang Học (Bắn 3 tia)</span>
+                        <button onclick="buySkin('laser', 300)" id="btn-skin-laser">300 🪙</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Súng Eco Huyền Thoại</span>
+                        <button onclick="buySkin('legend', 600)" id="btn-skin-legend">600 🪙</button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <button class="btn" onclick="closeShop()">QUAY LẠI ➡️</button>
+            </div>
+        </div>
+        
+        <!-- MÀN HÌNH THUA -->
+        <div id="gameover-screen" style="display:none;">
+            <h1>🌍 Trái Đất cần bạn!</h1>
+            <div id="final-score">Điểm: 0</div>
+            <p id="end-message">Bạn đã dọn dẹp được khá nhiều rác. Hãy tiếp tục bảo vệ môi trường!</p>
+            <div class="tip" id="eco-tip">
+                🌱 Hãy giảm sử dụng nhựa một lần, tái chế và trồng cây để phát triển bền vững.
+            </div>
+            <div>
+                <button class="btn" onclick="startGame()">CHƠI LẠI</button>
+                <button class="btn btn-secondary" onclick="openShopFromGameOver()">VÀO SHOP NÂNG CẤP</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let gameState = 'start';
+        let score = 0;
+        let level = 1;
+        let frame = 0;
+        
+        let coins = parseInt(localStorage.getItem('eco_coins')) || 50;
+        let maxLives = parseInt(localStorage.getItem('eco_maxLives')) || 10;
+        let lives = maxLives;
+        
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 70,
+            width: 60,
+            height: 45,
+            baseSpeed: 9,
+            speed: 9 + (parseInt(localStorage.getItem('eco_speedLevel')) - 1 || 0) * 0.9,
+            dx: 0,
+            fireRateLevel: parseInt(localStorage.getItem('eco_fireRateLevel')) || 1,
+            speedLevel: parseInt(localStorage.getItem('eco_speedLevel')) || 1,
+            currentSkin: localStorage.getItem('eco_currentSkin') || 'default',
+            unlockedSkins: JSON.parse(localStorage.getItem('eco_unlockedSkins')) || { default: true, plasma: false, laser: false, legend: false }
+        };
+
+        function saveGameData() {
+            localStorage.setItem('eco_coins', coins);
+            localStorage.setItem('eco_maxLives', maxLives);
+            localStorage.setItem('eco_fireRateLevel', player.fireRateLevel);
+            localStorage.setItem('eco_speedLevel', player.speedLevel);
+            localStorage.setItem('eco_currentSkin', player.currentSkin);
+            localStorage.setItem('eco_unlockedSkins', JSON.stringify(player.unlockedSkins));
+        }
+        
+        let skills = {
+            shield: { active: false, duration: 0, cooldown: 0, maxCd: 600 },
+            bomb: { cooldown: 0, maxCd: 900 }
+        };
+        
+        let bullets = [];
+        let trashes = [];
+        let particles = [];
+        let floatingTexts = [];
+        
+        const keys = {};
+        
+        const trashTypes = [
+            { emoji: '🧴', name: 'Chai nhựa', points: 10, coins: 5, color: '#42A5F5', speed: 1.0, danger: false },
+            { emoji: '🛍️', name: 'Túi nilon', points: 15, coins: 8, color: '#66BB6A', speed: 1.2, danger: false },
+            { emoji: '🥫', name: 'Lon kim loại', points: 20, coins: 10, color: '#FFA726', speed: 0.9, danger: false },
+            { emoji: '📦', name: 'Hộp giấy', points: 12, coins: 6, color: '#8D6E63', speed: 1.0, danger: false },
+            { emoji: '🔋', name: 'Pin độc hại', points: 30, coins: 15, color: '#EF5350', speed: 1.5, danger: true },
+            { emoji: '☢️', name: 'Chất thải độc', points: 40, coins: 20, color: '#AB47BC', speed: 1.8, danger: true }
+        ];
+        
+        document.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (gameState === 'playing') shoot();
+            }
+            if (e.code === 'KeyJ' && gameState === 'playing') useSkill('shield');
+            if (e.code === 'KeyK' && gameState === 'playing') useSkill('bomb');
+
+            if (e.code === 'KeyB') {
+                if (gameState === 'playing') {
+                    openShop();
+                } else if (gameState === 'shop') {
+                    closeShop();
+                }
+            }
+
+            if (e.code === 'KeyP' && gameState === 'playing') {
+                gameState = 'paused';
+                showMessage('TẠM DỪNG');
+            } else if (e.code === 'KeyP' && gameState === 'paused') {
+                gameState = 'playing';
+                hideMessage();
+            }
+        });
+        
+        document.addEventListener('keyup', e => {
+            keys[e.code] = false;
+        });
+        
+        function startGame() {
+            score = 0;
+            lives = maxLives;
+            level = 1;
+            frame = 0;
+            bullets = [];
+            trashes = [];
+            particles = [];
+            floatingTexts = [];
+            player.x = canvas.width / 2;
+            player.dx = 0;
+            
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('gameover-screen').style.display = 'none';
+            document.getElementById('shop-screen').style.display = 'none';
+            updateUI();
+            gameState = 'playing';
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function shoot() {
+            let bulletSpeed = 12 + (player.fireRateLevel - 1) * 2;
+            if (player.currentSkin === 'default') {
+                bullets.push({ x: player.x, y: player.y - 10, width: 7, height: 16, speed: bulletSpeed, color: '#00E676' });
+            } else if (player.currentSkin === 'plasma') {
+                bullets.push({ x: player.x - 15, y: player.y - 10, width: 6, height: 16, speed: bulletSpeed, color: '#29B6F6' });
+                bullets.push({ x: player.x + 15, y: player.y - 10, width: 6, height: 16, speed: bulletSpeed, color: '#29B6F6' });
+            } else if (player.currentSkin === 'laser') {
+                bullets.push({ x: player.x, y: player.y - 10, width: 9, height: 18, speed: bulletSpeed + 3, color: '#AB47BC' });
+                bullets.push({ x: player.x - 22, y: player.y - 5, width: 6, height: 14, speed: bulletSpeed, color: '#AB47BC' });
+                bullets.push({ x: player.x + 22, y: player.y - 5, width: 6, height: 14, speed: bulletSpeed, color: '#AB47BC' });
+            } else if (player.currentSkin === 'legend') {
+                bullets.push({ x: player.x, y: player.y - 15, width: 12, height: 20, speed: bulletSpeed + 5, color: '#FFD54F' });
+                bullets.push({ x: player.x - 18, y: player.y - 10, width: 7, height: 16, speed: bulletSpeed + 2, color: '#FF7043' });
+                bullets.push({ x: player.x + 18, y: player.y - 10, width: 7, height: 16, speed: bulletSpeed + 2, color: '#FF7043' });
+            }
+        }
+
+        function useSkill(type) {
+            if (gameState !== 'playing') return;
+            if (type === 'shield' && skills.shield.cooldown === 0) {
+                skills.shield.active = true;
+                skills.shield.duration = 300;
+                skills.shield.cooldown = skills.shield.maxCd;
+                showMessage('🛡️ BẬT LÁ CHẮN NĂNG LƯỢNG!');
+                setTimeout(hideMessage, 1500);
+            } else if (type === 'bomb' && skills.bomb.cooldown === 0) {
+                skills.bomb.cooldown = skills.bomb.maxCd;
+                trashes.forEach(t => {
+                    score += t.type.points;
+                    coins += t.type.coins;
+                    createParticles(t.x + t.size/2, t.y + t.size/2, t.type.color, 12);
+                });
+                trashes = [];
+                saveGameData();
+                showMessage('💥 SÓNG SIÊU ÂM QUÉT SẠCH RÁC!');
+                setTimeout(hideMessage, 1500);
+            }
+        }
+        
+        function spawnTrash() {
+            const type = trashTypes[Math.floor(Math.random() * trashTypes.length)];
+            const size = type.danger ? 42 : 36;
+            trashes.push({
+                x: Math.random() * (canvas.width - size),
+                y: -size,
+                size: size,
+                type: type,
+                speed: type.speed + (level - 1) * 0.15 + Math.random() * 0.3
+            });
+        }
+        
+        function createParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 35 + Math.random() * 20,
+                    color: color,
+                    size: 4 + Math.random() * 5
+                });
+            }
+        }
+
+        function addFloatingText(text, x, y, color = '#FFD54F') {
+            floatingTexts.push({ text, x, y, life: 45, color });
+        }
+        
+        function update() {
+            if (gameState !== 'playing') return;
+            
+            frame++;
+            
+            if (skills.shield.cooldown > 0) skills.shield.cooldown--;
+            if (skills.shield.active) {
+                skills.shield.duration--;
+                if (skills.shield.duration <= 0) skills.shield.active = false;
+            }
+            if (skills.bomb.cooldown > 0) skills.bomb.cooldown--;
+
+            document.getElementById('cd-shield').textContent = skills.shield.cooldown === 0 ? 'Sẵn sàng' : Math.ceil(skills.shield.cooldown/60) + 's';
+            document.getElementById('cd-bomb').textContent = skills.bomb.cooldown === 0 ? 'Sẵn sàng' : Math.ceil(skills.bomb.cooldown/60) + 's';
+            
+            player.dx = 0;
+            if (keys['ArrowLeft'] || keys['KeyA']) player.dx = -player.speed;
+            if (keys['ArrowRight'] || keys['KeyD']) player.dx = player.speed;
+            
+            player.x += player.dx;
+            player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
+            
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                bullets[i].y -= bullets[i].speed;
+                if (bullets[i].y < 0) bullets.splice(i, 1);
+            }
+            
+            const spawnRate = Math.max(40 - level * 2, 15);
+            if (frame % spawnRate === 0) {
+                spawnTrash();
+            }
+            
+            for (let i = trashes.length - 1; i >= 0; i--) {
+                const t = trashes[i];
+                t.y += t.speed;
+                
+                if (t.y + t.size > canvas.height - 25) {
+                    if (!skills.shield.active) {
+                        lives--;
+                        addFloatingText('-1 ❤️', player.x, player.y - 40, '#FF5252');
+                    } else {
+                        addFloatingText('Lá chắn chặn!', player.x, player.y - 40, '#42A5F5');
+                    }
+                    createParticles(t.x + t.size/2, t.y + t.size/2, '#EF5350', 12);
+                    trashes.splice(i, 1);
+                    updateUI();
+                    if (lives <= 0) {
+                        endGame();
+                        return;
+                    }
+                    continue;
+                }
+                
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const b = bullets[j];
+                    if (b.x > t.x && b.x < t.x + t.size &&
+                        b.y > t.y && b.y < t.y + t.size) {
+                        score += t.type.points;
+                        coins += t.type.coins;
+                        addFloatingText(`+${t.type.coins}🪙`, t.x, t.y, '#FFD54F');
+                        createParticles(t.x + t.size/2, t.y + t.size/2, t.type.color, 12);
+                        trashes.splice(i, 1);
+                        bullets.splice(j, 1);
+                        saveGameData();
+                        updateUI();
+                        
+                        if (score >= level * 300) {
+                            level++;
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.vy += 0.18;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let ft = floatingTexts[i];
+                ft.y -= 1;
+                ft.life--;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#2E7D32';
+            ctx.fillRect(0, canvas.height - 25, canvas.width, 25);
+            
+            drawPlayer();
+            
+            if (skills.shield.active) {
+                ctx.strokeStyle = '#42A5F5';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, 50, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(66, 165, 245, 0.15)';
+                ctx.fill();
+            }
+            
+            bullets.forEach(b => {
+                ctx.fillStyle = b.color;
+                ctx.beginPath();
+                ctx.roundRect(b.x - b.width/2, b.y, b.width, b.height, 4);
+                ctx.fill();
+            });
+            
+            trashes.forEach(t => {
+                ctx.fillStyle = t.type.color;
+                ctx.beginPath();
+                ctx.arc(t.x + t.size/2, t.y + t.size/2, t.size/2, 0, Math.PI*2);
+                ctx.fill();
+                
+                ctx.font = `${t.size * 0.7}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(t.type.emoji, t.x + t.size/2, t.y + t.size/2 + 2);
+            });
+            
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life / 40;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            floatingTexts.forEach(ft => {
+                ctx.globalAlpha = ft.life / 45;
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+            });
+            ctx.globalAlpha = 1;
+            
+            if (gameState === 'paused') {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+        
+        function drawPlayer() {
+            const px = player.x;
+            const py = player.y;
+            
+            let bodyColor = '#1565C0';
+            let cannonColor = '#42A5F5';
+            if (player.currentSkin === 'plasma') { bodyColor = '#0277BD'; cannonColor = '#00E5FF'; }
+            else if (player.currentSkin === 'laser') { bodyColor = '#6A1B9A'; cannonColor = '#CE93D8'; }
+            else if (player.currentSkin === 'legend') { bodyColor = '#E65100'; cannonColor = '#FFD54F'; }
+            
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.roundRect(px - 30, py - 18, 60, 35, 10);
+            ctx.fill();
+            
+            ctx.fillStyle = cannonColor;
+            ctx.beginPath();
+            ctx.roundRect(px - 8, py - 42, 16, 30, 5);
+            ctx.fill();
+            
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('♻️', px, py);
+            
+            ctx.fillStyle = '#37474F';
+            ctx.beginPath();
+            ctx.arc(px - 22, py + 14, 9, 0, Math.PI*2);
+            ctx.arc(px + 22, py + 14, 9, 0, Math.PI*2);
+            ctx.fill();
+        }
+        
+        function updateUI() {
+            document.getElementById('score').textContent = `Điểm: ${score}`;
+            document.getElementById('coins').textContent = `🪙 ${coins}`;
+            document.getElementById('level').textContent = `Cấp: ${level}`;
+            const hearts = '❤️'.repeat(lives) + '🖤'.repeat(maxLives - lives);
+            document.getElementById('lives').textContent = `Mạng: ${hearts} (${lives}/${maxLives})`;
+        }
+        
+        function showMessage(text) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.style.opacity = '1';
+        }
+        
+        function hideMessage() {
+            document.getElementById('message').style.opacity = '0';
+        }
+        
+        function openShop() {
+            if (gameState === 'playing' || gameState === 'gameover') {
+                gameState = 'shop';
+            }
+            // Ẩn bảng thua cuộc đi khi mở shop
+            document.getElementById('gameover-screen').style.display = 'none';
+            
+            document.getElementById('shop-coins').textContent = coins;
+            document.getElementById('lvl-firespeed').textContent = player.fireRateLevel;
+            document.getElementById('lvl-speed').textContent = player.speedLevel;
+            
+            document.getElementById('btn-skin-plasma').textContent = player.unlockedSkins.plasma ? 'Đã sở hữu' : '150 🪙';
+            document.getElementById('btn-skin-plasma').disabled = player.unlockedSkins.plasma || player.currentSkin === 'plasma';
+            
+            document.getElementById('btn-skin-laser').textContent = player.unlockedSkins.laser ? 'Đã sở hữu' : '300 🪙';
+            document.getElementById('btn-skin-laser').disabled = player.unlockedSkins.laser || player.currentSkin === 'laser';
+
+            document.getElementById('btn-skin-legend').textContent = player.unlockedSkins.legend ? 'Đã sở hữu' : '600 🪙';
+            document.getElementById('btn-skin-legend').disabled = player.unlockedSkins.legend || player.currentSkin === 'legend';
+
+            document.getElementById('shop-screen').style.display = 'flex';
+        }
+
+        function openShopFromGameOver() {
+            openShop();
+        }
+
+        function closeShop() {
+            document.getElementById('shop-screen').style.display = 'none';
+            // Nếu đang thua mà bấm quay lại thì hiện lại bảng thua, còn đang chơi thì tiếp tục chơi
+            if (lives <= 0) {
+                document.getElementById('gameover-screen').style.display = 'flex';
+                gameState = 'gameover';
+            } else {
+                gameState = 'playing';
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function buyUpgrade(type) {
+            if (type === 'fireSpeed' && coins >= 50) {
+                coins -= 50;
+                player.fireRateLevel++;
+                document.getElementById('lvl-firespeed').textContent = player.fireRateLevel;
+            } else if (type === 'speed' && coins >= 40) {
+                coins -= 40;
+                player.speedLevel++;
+                player.speed = player.baseSpeed + (player.speedLevel - 1) * 0.9;
+                document.getElementById('lvl-speed').textContent = player.speedLevel;
+            } else if (type === 'life' && coins >= 80) {
+                coins -= 80;
+                maxLives++;
+                lives = Math.min(maxLives, lives + 1);
+            }
+            saveGameData();
+            document.getElementById('shop-coins').textContent = coins;
+            updateUI();
+        }
+
+        function buySkin(skinName, cost) {
+            if (coins >= cost && !player.unlockedSkins[skinName]) {
+                coins -= cost;
+                player.unlockedSkins[skinName] = true;
+                player.currentSkin = skinName;
+                saveGameData();
+                openShop();
+                updateUI();
+            } else if (player.unlockedSkins[skinName]) {
+                player.currentSkin = skinName;
+                saveGameData();
+                openShop();
+            }
+        }
+        
+        function endGame() {
+            gameState = 'gameover';
+            saveGameData();
+            document.getElementById('final-score').textContent = `Điểm: ${score} | Xu kiếm được: 🪙 ${coins}`;
+            document.getElementById('gameover-screen').style.display = 'flex';
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            if (gameState === 'playing' || gameState === 'paused') {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.beginPath();
+                this.moveTo(x + r, y);
+                this.arcTo(x + w, y, x + w, y + h, r);
+                this.arcTo(x + w, y + h, x, y + h, r);
+                this.arcTo(x, y + h, x, y, r);
+                this.arcTo(x, y, x + w, y, r);
+                this.closePath();
+                return this;
+            };
+        }
+    </script>
+</body>
+</html>
