@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Eco Blaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --panel: rgba(14, 34, 24, .72);
+        --stroke: rgba(255, 255, 255, .22);
+        --gold: #FFD54F;
+        --mint: #69F0AE;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+        width: 100%; height: 100%; overflow: hidden;
+        background: #0d1b14; color: #fff;
+        font-family: 'Baloo 2', 'Segoe UI', system-ui, sans-serif;
+        user-select: none; -webkit-user-select: none;
+    }
+    #game { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    .hidden { display: none !important; }
+    body.menu #hud, body.menu #skills, body.menu #controls { opacity: 0; pointer-events: none; }
+    #hud, #skills { transition: opacity .3s; }
+
+    /* ---------- HUD ---------- */
+    #hud {
+        position: absolute; top: 12px; left: 12px; right: 12px; z-index: 10;
+        display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+        flex-wrap: wrap; pointer-events: none;
+    }
+    .cluster { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pill {
+        background: var(--panel); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        border: 1px solid var(--stroke); border-radius: 14px;
+        padding: 5px 14px; font-weight: 700; font-size: 17px; line-height: 1.25;
+        box-shadow: 0 4px 14px rgba(0,0,0,.25);
+        display: flex; align-items: center; gap: 6px;
+    }
+    .pill small { font-size: 12px; opacity: .7; font-weight: 500; }
+    #score { font-size: 22px; color: #B9F6CA; min-width: 2ch; }
+    #level-pill { flex-direction: column; align-items: stretch; gap: 3px; min-width: 120px; }
+    .bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,.18); overflow: hidden; }
+    .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #69F0AE, #00E676); transition: width .25s; }
+    #coin-pill { color: var(--gold); }
+    #lives { font-size: 15px; letter-spacing: 1px; }
+    .icon-btn {
+        pointer-events: auto; cursor: pointer; font-family: inherit; color: #fff;
+        transition: transform .15s, filter .15s;
+    }
+    .icon-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+    .icon-btn:active { transform: scale(.95); }
+    #btn-shop { background: linear-gradient(135deg, #FFA726, #EF6C00); border-color: rgba(255,255,255,.35); }
+    #btn-auto.on { background: linear-gradient(135deg, #00C853, #1B5E20); }
+
+    /* ---------- Skills ---------- */
+    #skills { position: absolute; right: 14px; bottom: 46px; display: flex; gap: 10px; z-index: 10; }
+    .skill {
+        position: relative; width: 76px; height: 76px; border-radius: 18px;
+        background: var(--panel); border: 2px solid rgba(255,255,255,.25); color: #fff;
+        font-family: inherit; cursor: pointer; overflow: hidden;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        box-shadow: 0 4px 14px rgba(0,0,0,.3);
+    }
+    .skill .ico { font-size: 28px; line-height: 1; }
+    .skill .lbl { font-size: 12px; font-weight: 700; margin-top: 2px; }
+    .skill .key { position: absolute; top: 2px; right: 7px; font-size: 11px; opacity: .7; }
+    .skill .cd {
+        position: absolute; inset: 0; pointer-events: none;
+        background: conic-gradient(rgba(0,0,0,.72) calc(var(--p, 0) * 360deg), transparent 0);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; font-weight: 800; text-shadow: 0 2px 4px #000;
+    }
+    .skill.ready { border-color: var(--mint); animation: ready 1.8s ease-in-out infinite; }
+    @keyframes ready { 50% { box-shadow: 0 0 18px rgba(105,240,174,.6); } }
+
+    #controls {
+        position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; z-index: 5;
+        font-size: 13px; color: rgba(255,255,255,.88); text-shadow: 0 1px 3px rgba(0,0,0,.6);
+        pointer-events: none; padding: 0 100px; transition: opacity 1s;
+    }
+
+    #message {
+        position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%) scale(.6);
+        font-size: clamp(22px, 4vw, 40px); font-weight: 800; text-align: center; white-space: nowrap;
+        color: #fff; text-shadow: 0 0 16px rgba(76,175,80,.9), 0 3px 0 rgba(0,0,0,.35);
+        opacity: 0; pointer-events: none; z-index: 15; transition: opacity .3s, transform .3s;
+    }
+    #message.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+    /* ---------- Overlays ---------- */
+    .overlay {
+        position: absolute; inset: 0; z-index: 20; overflow-y: auto;
+        display: flex; padding: 20px;
+        background: radial-gradient(ellipse at center, rgba(8,40,24,.78), rgba(0,0,0,.9));
+        animation: fade .35s ease;
+    }
+    @keyframes fade { from { opacity: 0; } }
+    .card { margin: auto; text-align: center; max-width: 560px; width: 100%; }
+    .card.wide { max-width: 900px; }
+    .logo { font-size: 72px; line-height: 1; animation: spin 14s linear infinite; display: inline-block; filter: drop-shadow(0 0 20px rgba(105,240,174,.5)); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 {
+        font-size: clamp(40px, 8vw, 68px); font-weight: 800; line-height: 1.05; margin-top: 6px;
+        background: linear-gradient(180deg, #B9F6CA, #00C853); -webkit-background-clip: text; background-clip: text; color: transparent;
+        filter: drop-shadow(0 4px 0 rgba(0,0,0,.35));
+    }
+    .sub { font-size: 20px; color: #A5D6A7; margin-bottom: 18px; }
+    .howto { display: grid; gap: 8px; text-align: left; margin: 0 auto 16px; max-width: 420px; }
+    .howto div { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; padding: 8px 14px; font-size: 15px; }
+    .howto b { display: inline-block; width: 28px; font-size: 18px; }
+    .best { color: var(--gold); font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+    .row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+    .btn {
+        font-family: inherit; font-size: 19px; font-weight: 800; letter-spacing: .5px; color: #fff;
+        background: linear-gradient(135deg, #4CAF50, #1B5E20); border: none; border-radius: 30px;
+        padding: 12px 34px; cursor: pointer; box-shadow: 0 5px 0 #0f3d14, 0 8px 20px rgba(0,0,0,.35);
+        transition: transform .12s, box-shadow .12s, filter .12s;
+    }
+    .btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+    .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #0f3d14; }
+    .btn-orange { background: linear-gradient(135deg, #FFA726, #E65100); box-shadow: 0 5px 0 #7a2e00, 0 8px 20px rgba(0,0,0,.35); }
+    .btn-orange:active { box-shadow: 0 2px 0 #7a2e00; }
+    .keys { margin-top: 18px; font-size: 13px; color: rgba(255,255,255,.6); line-height: 1.6; }
+
+    /* Shop */
+    #shop-screen h2 { font-size: 34px; color: var(--gold); }
+    .shop-coins { font-size: 22px; font-weight: 800; color: var(--gold); margin-bottom: 14px; }
+    .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: left; }
+    @media (max-width: 720px) { .shop-grid { grid-template-columns: 1fr; } }
+    .shop-grid section { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 16px; padding: 14px; }
+    .shop-grid h3 { font-size: 18px; color: #A5D6A7; margin-bottom: 8px; }
+    .item { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.28); border-radius: 12px; padding: 9px 12px; margin-bottom: 8px; }
+    .item.equipped { outline: 2px solid var(--mint); }
+    .item .info { flex: 1; min-width: 0; }
+    .item .name { font-weight: 700; font-size: 16px; }
+    .item .desc { font-size: 13px; opacity: .7; line-height: 1.3; }
+    .pips { display: flex; gap: 3px; margin-top: 4px; }
+    .pips i { width: 14px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.18); }
+    .pips i.on { background: var(--mint); }
+    .buy {
+        font-family: inherit; font-weight: 800; font-size: 14px; color: #fff; white-space: nowrap;
+        background: #43A047; border: none; border-radius: 10px; padding: 7px 12px; cursor: pointer; min-width: 92px;
+    }
+    .buy:hover:not(:disabled) { background: #2E7D32; }
+    .buy:disabled { background: #4a4a4a; color: #aaa; cursor: not-allowed; }
+    .buy.equip { background: #1E88E5; }
+
+    /* Game over */
+    .go-title { font-size: clamp(32px, 6vw, 48px); background: linear-gradient(180deg, #FFCCBC, #FF7043); -webkit-background-clip: text; background-clip: text; }
+    .badge { display: inline-block; margin: 8px 0; padding: 4px 16px; border-radius: 20px; background: linear-gradient(135deg, #FFD54F, #FF8F00); color: #3e2700; font-weight: 800; animation: pop .6s ease; }
+    @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.2); } }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 14px 0; }
+    @media (max-width: 520px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+    .stats div { background: rgba(255,255,255,.08); border-radius: 12px; padding: 8px 4px; }
+    .stats span { display: block; font-size: 12px; opacity: .7; }
+    .stats b { font-size: 24px; color: var(--gold); }
+    .tip { background: rgba(105,240,174,.1); border-left: 4px solid var(--mint); border-radius: 10px; padding: 12px 16px; text-align: left; font-size: 15px; line-height: 1.5; }
+
+    @media (max-width: 600px) {
+        .pill { font-size: 14px; padding: 4px 10px; }
+        #score { font-size: 18px; }
+        #level-pill { min-width: 90px; }
+        .skill { width: 66px; height: 66px; }
+        #controls { padding: 0 10px; bottom: 120px; }
+    }
+</style>
+</head>
+<body>
+<div id="game">
+    <canvas id="c"></canvas>
+
+    <div id="hud">
+        <div class="cluster">
+            <div class="pill"><small>Điểm</small><span id="score">0</span></div>
+            <div class="pill" id="level-pill">
+                <div>Cấp <span id="level">1</span></div>
+                <div class="bar"><i id="level-bar"></i></div>
+            </div>
+            <div class="pill" id="coin-pill">🪙 <span id="coins">0</span></div>
+        </div>
+        <div class="cluster">
+            <div class="pill" id="lives">❤️</div>
+            <button class="pill icon-btn" id="btn-auto" title="Tự động bắn (F)">🎯 Auto</button>
+            <button class="pill icon-btn" id="btn-shop" title="Cửa hàng (B)">🛒 Shop</button>
+            <button class="pill icon-btn" id="btn-pause" title="Tạm dừng (P)">⏸</button>
+            <button class="pill icon-btn" id="btn-mute" title="Âm thanh (M)">🔊</button>
+        </div>
+    </div>
+
+    <div id="skills">
+        <button class="skill" id="skill-shield"><span class="key">J</span><span class="ico">🛡️</span><span class="lbl">Lá chắn</span><span class="cd"></span></button>
+        <button class="skill" id="skill-bomb"><span class="key">K</span><span class="ico">💥</span><span class="lbl">Sóng quét</span><span class="cd"></span></button>
+    </div>
+
+    <div id="controls"></div>
+    <div id="message"></div>
+
+    <!-- BẮT ĐẦU -->
+    <div id="start-screen" class="overlay">
+        <div class="card">
+            <div class="logo">🌍</div>
+            <h1>ECO BLASTER</h1>
+            <p class="sub">Bắn rác · Cứu Trái Đất</p>
+            <div class="howto">
+                <div><b>🎯</b>Bắn hạ rác trước khi nó rơi xuống đất</div>
+                <div><b>🌱</b>Hứng cây non để hồi máu — <u>đừng bắn cây!</u></div>
+                <div><b>⚡</b>Nhặt vật phẩm rơi ra để tăng sức mạnh</div>
+                <div><b>🔥</b>Bắn liên tục để tăng combo, nhân điểm tới x3</div>
+                <div><b>👹</b>Cứ 5 cấp lại có một Quái Vật Rác</div>
+            </div>
+            <div class="best">🏆 Kỷ lục: <span id="best-start">0</span></div>
+            <div class="row">
+                <button class="btn" id="btn-start">▶ BẮT ĐẦU</button>
+                <button class="btn btn-orange" id="btn-start-shop">🛒 Cửa hàng</button>
+            </div>
+            <p class="keys" id="keys-hint"></p>
+        </div>
+    </div>
+
+    <!-- TẠM DỪNG -->
+    <div id="pause-screen" class="overlay hidden">
+        <div class="card">
+            <h1>TẠM DỪNG</h1>
+            <div class="row">
+                <button class="btn" id="btn-resume">▶ Tiếp tục</button>
+                <button class="btn btn-orange" id="btn-pause-shop">🛒 Cửa hàng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHOP -->
+    <div id="shop-screen" class="overlay hidden">
+        <div class="card wide">
+            <h2>🛒 Cửa hàng nâng cấp</h2>
+            <div class="shop-coins">🪙 <span id="shop-coins">0</span></div>
+            <div class="shop-grid">
+                <section><h3>⚡ Nâng cấp</h3><div id="shop-upgrades"></div></section>
+                <section><h3>🔫 Vũ khí</h3><div id="shop-weapons"></div></section>
+            </div>
+            <div class="row"><button class="btn" id="btn-close-shop">Quay lại ➜</button></div>
+        </div>
+    </div>
+
+    <!-- THUA -->
+    <div id="gameover-screen" class="overlay hidden">
+        <div class="card">
+            <div class="logo">🌍</div>
+            <h1 class="go-title">Trái Đất cần bạn!</h1>
+            <div id="new-record" class="badge hidden">🏆 KỶ LỤC MỚI!</div>
+            <div class="stats">
+                <div><span>Điểm</span><b id="go-score">0</b></div>
+                <div><span>Cấp</span><b id="go-level">1</b></div>
+                <div><span>Rác đã dọn</span><b id="go-kills">0</b></div>
+                <div><span>Xu kiếm được</span><b id="go-coins">0</b></div>
+            </div>
+            <div class="tip" id="eco-tip"></div>
+            <div class="row">
+                <button class="btn" id="btn-retry">↻ CHƠI LẠI</button>
+                <button class="btn btn-orange" id="btn-go-shop">🛒 Nâng cấp</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const canvas = $('c');
+const ctx = canvas.getContext('2d');
+
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        this.moveTo(x + r, y);
+        this.arcTo(x + w, y, x + w, y + h, r);
+        this.arcTo(x + w, y + h, x, y + h, r);
+        this.arcTo(x, y + h, x, y, r);
+        this.arcTo(x, y, x + w, y, r);
+        this.closePath();
+        return this;
+    };
+}
+
+/* =================== LƯU TRỮ =================== */
+const SAVE_KEY = 'eco_blaster_v2';
+const DEFAULT_SAVE = {
+    coins: 50, best: 0, muted: false, autoFire: false,
+    up: { fireRate: 0, damage: 0, speed: 0, life: 0, cooldown: 0 },
+    weapons: { default: true }, weapon: 'default'
+};
+function loadSave() {
+    const fresh = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+    try {
+        const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+        if (s) return { ...fresh, ...s, up: { ...fresh.up, ...s.up }, weapons: { ...fresh.weapons, ...s.weapons } };
+        // Chuyển dữ liệu từ bản cũ (xu + súng đã mua)
+        const oldCoins = parseInt(localStorage.getItem('eco_coins'));
+        if (!isNaN(oldCoins)) fresh.coins = oldCoins;
+        const oldSkins = JSON.parse(localStorage.getItem('eco_unlockedSkins') || 'null');
+        if (oldSkins) for (const k in oldSkins) if (oldSkins[k]) fresh.weapons[k] = true;
+    } catch (e) { /* bỏ qua */ }
+    return fresh;
+}
+let save = loadSave();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* bỏ qua */ } }
+
+/* =================== CẤU HÌNH =================== */
+const BASE_LIVES = 5;
+const maxLives = () => BASE_LIVES + save.up.life;
+
+const UPGRADES = {
+    fireRate: { name: '⚡ Tốc độ bắn',  desc: 'Bắn nhanh hơn',                       base: 40, max: 10 },
+    damage:   { name: '💪 Sát thương',  desc: 'Hạ rác cứng & quái vật nhanh hơn',     base: 60, max: 8 },
+    speed:    { name: '🏃 Tốc độ xe',   desc: 'Di chuyển nhanh hơn',                 base: 35, max: 8 },
+    life:     { name: '❤️ Mạng tối đa', desc: '+1 mạng mỗi cấp',                     base: 90, max: 5 },
+    cooldown: { name: '⏱️ Hồi chiêu',   desc: 'Giảm 10% thời gian hồi kỹ năng',      base: 70, max: 5 },
+};
+const upCost = k => Math.round(UPGRADES[k].base * Math.pow(1.55, save.up[k]));
+
+const WEAPONS = {
+    default: { name: 'Súng Tái Chế',      desc: '1 tia cơ bản',          cost: 0,   body: '#1565C0', cannon: '#42A5F5', bullet: '#00E676',
+               pattern: [[0, 0]] },
+    plasma:  { name: 'Plasma Xanh',       desc: 'Đạn kép song song',     cost: 150, body: '#00838F', cannon: '#00E5FF', bullet: '#29B6F6',
+               pattern: [[-12, 0], [12, 0]] },
+    laser:   { name: 'Pháo Quang Học',    desc: '3 tia toả rộng',        cost: 350, body: '#6A1B9A', cannon: '#CE93D8', bullet: '#E040FB',
+               pattern: [[0, 0], [-12, -0.13], [12, 0.13]] },
+    legend:  { name: 'Eco Huyền Thoại',   desc: '5 tia + đạn xuyên rác', cost: 800, body: '#E65100', cannon: '#FFD54F', bullet: '#FFD54F',
+               pattern: [[0, 0], [-10, -0.08], [10, 0.08], [-18, -0.2], [18, 0.2]], pierce: 1 },
+};
+
+const TRASH = [
+    { id: 'bottle',  emoji: '🧴', name: 'Chai nhựa',     pts: 10, coin: 3,  color: '#42A5F5', speed: 1.0, hp: 1, weight: 5 },
+    { id: 'bag',     emoji: '🛍️', name: 'Túi nilon',     pts: 15, coin: 4,  color: '#66BB6A', speed: 0.8, hp: 1, weight: 4, zig: true },
+    { id: 'box',     emoji: '📦', name: 'Hộp giấy',      pts: 12, coin: 3,  color: '#A1887F', speed: 1.0, hp: 1, weight: 4 },
+    { id: 'can',     emoji: '🥫', name: 'Lon kim loại',  pts: 20, coin: 5,  color: '#FFA726', speed: 0.9, hp: 2, weight: 4 },
+    { id: 'battery', emoji: '🔋', name: 'Pin cũ',        pts: 30, coin: 8,  color: '#EF5350', speed: 1.45, hp: 2, weight: 2, danger: true, minLevel: 2 },
+    { id: 'toxic',   emoji: '☢️', name: 'Chất thải độc', pts: 50, coin: 12, color: '#AB47BC', speed: 1.15, hp: 4, weight: 1.5, danger: true, minLevel: 3 },
+    { id: 'tire',    emoji: '🛞', name: 'Lốp xe cũ',     pts: 45, coin: 10, color: '#607D8B', speed: 0.6, hp: 7, weight: 1, big: true, minLevel: 4 },
+];
+
+const POWERS = {
+    rapid:  { emoji: '⚡', name: 'Bắn siêu tốc!',   color: '#FFEB3B', dur: 480 },
+    slow:   { emoji: '⏳', name: 'Làm chậm rác!',   color: '#80DEEA', dur: 360 },
+    double: { emoji: '💰', name: 'Nhân đôi xu!',    color: '#FFD54F', dur: 600 },
+    heal:   { emoji: '💚', name: '+1 Mạng!',        color: '#69F0AE', dur: 0 },
+};
+
+const FACTS = {
+    bottle:  '🧴 Một chai nhựa ước tính mất khoảng 450 năm để phân huỷ. Hãy dùng bình nước cá nhân nhé!',
+    bag:     '🛍️ Túi nilon có thể tồn tại hàng trăm năm trong tự nhiên. Mang túi vải khi đi chợ thay vì xin túi mới.',
+    box:     '📦 Giấy và bìa carton rất dễ tái chế — hãy làm phẳng, giữ khô và để riêng khi phân loại.',
+    can:     '🥫 Lon nhôm có thể tái chế gần như vô hạn lần mà không giảm chất lượng.',
+    battery: '🔋 Pin cũ chứa kim loại nặng. Đừng vứt chung rác — hãy mang tới điểm thu gom pin.',
+    toxic:   '☢️ Chất thải nguy hại cần được thu gom và xử lý riêng, tuyệt đối không đổ ra môi trường.',
+    tire:    '🛞 Lốp xe cũ có thể tái chế thành sân chơi, đường chạy hoặc vật liệu xây dựng.',
+};
+const GENERAL_FACTS = [
+    '🌱 Phân loại rác tại nguồn giúp việc tái chế hiệu quả hơn rất nhiều.',
+    '🌳 Mỗi cây xanh bạn trồng là thêm bóng mát và không khí trong lành.',
+    '♻️ Giảm thiểu – Tái sử dụng – Tái chế: 3 bước đơn giản để bảo vệ Trái Đất.',
+];
+
+/* =================== ÂM THANH (WebAudio, không cần file) =================== */
+let actx = null, noiseBuf = null;
+function ensureAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; } }
+    if (actx.state === 'suspended') actx.resume();
+}
+function tone(freq, dur, type = 'square', vol = 0.05, slide = 0, delay = 0) {
+    if (save.muted || !actx) return;
+    const t = actx.currentTime + delay;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur = 0.1, vol = 0.05, freq = 1500) {
+    if (save.muted || !actx) return;
+    if (!noiseBuf) {
+        noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.6, actx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t = actx.currentTime;
+    const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+    src.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(actx.destination);
+    src.start(t); src.stop(t + dur);
+}
+let lastHitSfx = 0;
+const sfx = {
+    shoot: () => tone(700 + Math.random() * 100, 0.05, 'square', 0.012, -300),
+    hit: () => { const n = performance.now(); if (n - lastHitSfx > 45) { lastHitSfx = n; noise(0.05, 0.04, 2500); } },
+    kill: () => { tone(500, 0.09, 'triangle', 0.05, 350); noise(0.12, 0.04, 1800); },
+    hurt: () => { tone(220, 0.28, 'sawtooth', 0.06, -140); noise(0.2, 0.05, 600); },
+    bad: () => tone(320, 0.2, 'square', 0.04, -180),
+    power: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.12, 'triangle', 0.06, 0, i * 0.06)),
+    level: () => [392, 523, 659, 784].forEach((f, i) => tone(f, 0.14, 'square', 0.03, 0, i * 0.08)),
+    combo: () => tone(880, 0.1, 'triangle', 0.05, 440),
+    boss: () => { tone(110, 0.7, 'sawtooth', 0.07, -40); tone(82, 0.7, 'sawtooth', 0.06, -20, 0.35); },
+    bomb: () => { noise(0.7, 0.12, 700); tone(90, 0.6, 'sine', 0.14, -50); },
+    shield: () => tone(440, 0.35, 'sine', 0.07, 440),
+    buy: () => { tone(880, 0.08, 'triangle', 0.05); tone(1320, 0.12, 'triangle', 0.05, 0, 0.07); },
+    over: () => [392, 330, 262, 196].forEach((f, i) => tone(f, 0.3, 'triangle', 0.06, 0, i * 0.18)),
+};
+
+/* =================== TRẠNG THÁI =================== */
+let W = 0, H = 0, DPR = 1, S = 1, VS = 1, groundY = 0;
+let state = 'start', shopReturn = 'start';
+let score = 0, level = 1, lives = BASE_LIVES, combo = 0, comboTimer = 0, comboPulse = 0;
+let runCoins = 0, kills = 0, killsByType = {}, planted = 0;
+let bullets = [], trashes = [], particles = [], texts = [], powerups = [], friends = [], waves = [];
+let boss = null;
+let spawnTimer = 0, friendTimer = 0, fireTimer = 0, recoil = 0, shake = 0, hurtFlash = 0, whiteFlash = 0, time = 0;
+let pollution = 0, hudBottom = 60;
+const buffs = { rapid: 0, slow: 0, double: 0 };
+const skills = {
+    shield: { cd: 0, active: 0, max: 900, dur: 300 },
+    bomb:   { cd: 0, max: 1200 },
+};
+const player = { x: 0, y: 0, wheel: 0 };
+const keys = {};
+const pointer = { active: false, x: 0 };
+const isTouch = window.matchMedia('(pointer: coarse)').matches;
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const threshold = l => 250 * l * (l + 1) / 2;   // điểm cần để lên cấp l+1
+const comboMult = () => 1 + Math.min(4, Math.floor(combo / 10)) * 0.5;
+const cdMax = k => skills[k].max * (1 - 0.1 * save.up.cooldown);
+
+/* =================== EMOJI CACHE =================== */
+const emojiCache = new Map();
+function drawEmoji(e, x, y, size, rot = 0) {
+    const key = e + '|' + Math.round(size);
+    let img = emojiCache.get(key);
+    if (!img) {
+        img = document.createElement('canvas');
+        const px = Math.ceil(size * 1.35 * DPR);
+        img.width = img.height = px;
+        const g = img.getContext('2d');
+        g.font = `${size * DPR}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(e, px / 2, px / 2 + size * DPR * 0.06);
+        emojiCache.set(key, img);
+    }
+    const d = img.width / DPR;
+    if (rot) {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+        ctx.drawImage(img, -d / 2, -d / 2, d, d);
+        ctx.restore();
+    } else ctx.drawImage(img, x - d / 2, y - d / 2, d, d);
+}
+
+/* =================== KÍCH THƯỚC & PHONG CẢNH =================== */
+let clouds = [], trees = [];
+function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    S = clamp(Math.min(W / 1000, H / 760), 0.72, 1.25);
+    VS = clamp(H / 800, 0.75, 1.35);
+    groundY = H - 32 * S;
+    player.y = groundY - 26 * S;
+    player.x = clamp(player.x || W / 2, 40 * S, W - 40 * S);
+    emojiCache.clear();
+    buildScenery();
+    updateHUD();
+}
+function buildScenery() {
+    clouds = Array.from({ length: Math.ceil(W / 240) + 2 }, () => ({
+        x: Math.random() * W, y: rand(40, H * 0.32), s: rand(0.6, 1.4), v: rand(0.12, 0.4)
+    }));
+    const oldG = trees.map(t => t.g);
+    const n = Math.max(12, Math.round(W / 55));
+    trees = [];
+    for (let i = 0; i < n; i++) trees.push({ x: (i + 0.5) / n * W + rand(-0.3, 0.3) * W / n, s: rand(0.75, 1.35), g: 0, r: Math.random() });
+    trees.sort((a, b) => a.r - b.r);
+    trees.forEach((t, i) => t.g = oldG[i] || 0);
+}
+function hillY(x, layer) {
+    const base = groundY - (layer === 0 ? 125 : 52) * S;
+    const amp = (layer === 0 ? 42 : 20) * S;
+    return base + Math.sin(x * 0.0035 + layer * 2.1) * amp + Math.sin(x * 0.011 + layer) * amp * 0.4;
+}
+function rgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mix(a, b, t) {
+    const pa = rgb(a), pb = rgb(b);
+    return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(',')})`;
+}
+
+/* =================== GAME FLOW =================== */
+function show(id, on) { $(id).classList.toggle('hidden', !on); }
+
+function startGame() {
+    ensureAudio();
+    score = 0; level = 1; lives = maxLives(); combo = 0; comboTimer = 0;
+    runCoins = 0; kills = 0; killsByType = {}; planted = 0; time = 0;
+    bullets = []; trashes = []; particles = []; texts = []; powerups = []; friends = []; waves = [];
+    boss = null; spawnTimer = 30; friendTimer = rand(600, 900); fireTimer = 0;
+    shake = hurtFlash = whiteFlash = 0;
+    for (const k in buffs) buffs[k] = 0;
+    skills.shield.cd = skills.shield.active = skills.bomb.cd = 0;
+    player.x = W / 2;
+    ['start-screen', 'gameover-screen', 'shop-screen', 'pause-screen'].forEach(id => show(id, false));
+    state = 'playing';
+    updateHUD();
+    showControlsHint();
+    showMessage('🌍 Bắt đầu dọn rác!');
+}
+
+function endGame() {
+    state = 'gameover';
+    pointer.active = false;
+    const record = score > save.best;
+    if (record) save.best = score;
+    persist();
+    sfx.over();
+    $('go-score').textContent = score.toLocaleString('vi-VN');
+    $('go-level').textContent = level;
+    $('go-kills').textContent = kills;
+    $('go-coins').textContent = '+' + runCoins;
+    show('new-record', record && score > 0);
+    let top = null, topN = 0;
+    for (const k in killsByType) if (killsByType[k] > topN) { top = k; topN = killsByType[k]; }
+    $('eco-tip').textContent = top && Math.random() < 0.75 ? FACTS[top] : GENERAL_FACTS[Math.floor(Math.random() * GENERAL_FACTS.length)];
+    setTimeout(() => { if (state === 'gameover') show('gameover-screen', true); }, 700);
+}
+
+function togglePause() {
+    if (state === 'playing') {
+        state = 'paused'; pointer.active = false; persist();
+        show('pause-screen', true);
+    } else if (state === 'paused') {
+        state = 'playing';
+        show('pause-screen', false);
+    }
+}
+
+function openShop() {
+    if (state === 'shop') return;
+    shopReturn = state === 'paused' ? 'playing' : state;
+    state = 'shop'; pointer.active = false;
+    ['start-screen', 'gameover-screen', 'pause-screen'].forEach(id => show(id, false));
+    persist();
+    renderShop();
+    show('shop-screen', true);
+}
+function closeShop() {
+    show('shop-screen', false);
+    state = shopReturn;
+    if (state === 'start') { $('best-start').textContent = save.best.toLocaleString('vi-VN'); show('start-screen', true); }
+    else if (state === 'gameover') show('gameover-screen', true);
+    else showMessage('Tiếp tục!', 900);
+    updateHUD();
+}
+
+function renderShop() {
+    $('shop-coins').textContent = save.coins.toLocaleString('vi-VN');
+    const upBox = $('shop-upgrades'); upBox.innerHTML = '';
+    for (const [k, u] of Object.entries(UPGRADES)) {
+        const lv = save.up[k], maxed = lv >= u.max, cost = upCost(k);
+        const row = document.createElement('div');
+        row.className = 'item';
+        row.innerHTML = `<div class="info"><div class="name">${u.name}</div><div class="desc">${u.desc}</div>
+            <div class="pips">${'<i class="on"></i>'.repeat(lv)}${'<i></i>'.repeat(u.max - lv)}</div></div>`;
+        const btn = document.createElement('button');
+        btn.className = 'buy';
+        btn.textContent = maxed ? 'TỐI ĐA' : `${cost} 🪙`;
+        btn.disabled = maxed || save.coins < cost;
+        btn.onclick = () => buyUpgrade(k);
+        row.appendChild(btn);
+        upBox.appendChild(row);
+    }
+    const wBox = $('shop-weapons'); wBox.innerHTML = '';
+    for (const [k, w] of Object.entries(WEAPONS)) {
+        const owned = !!save.weapons[k], equipped = save.weapon === k;
+        const row = document.createElement('div');
+        row.className = 'item' + (equipped ? ' equipped' : '');
+        row.innerHTML = `<div class="info"><div class="name"><span style="color:${w.bullet}">●</span> ${w.name}</div><div class="desc">${w.desc}</div></div>`;
+        const btn = document.createElement('button');
+        btn.className = 'buy' + (owned && !equipped ? ' equip' : '');
+        btn.textContent = equipped ? 'Đang dùng' : owned ? 'Trang bị' : `${w.cost} 🪙`;
+        btn.disabled = equipped || (!owned && save.coins < w.cost);
+        btn.onclick = () => buyWeapon(k);
+        row.appendChild(btn);
+        wBox.appendChild(row);
+    }
+}
+function buyUpgrade(k) {
+    const cost = upCost(k);
+    if (save.up[k] >= UPGRADES[k].max || save.coins < cost) return;
+    save.coins -= cost;
+    save.up[k]++;
+    if (k === 'life' && shopReturn === 'playing') lives++;
+    persist(); sfx.buy(); renderShop(); updateHUD();
+}
+function buyWeapon(k) {
+    const w = WEAPONS[k];
+    if (!save.weapons[k]) {
+        if (save.coins < w.cost) return;
+        save.coins -= w.cost;
+        save.weapons[k] = true;
+    }
+    save.weapon = k;
+    persist(); sfx.buy(); renderShop(); updateHUD();
+}
+
+/* =================== HÀNH ĐỘNG =================== */
+function fireInterval() {
+    const base = Math.max(5, 17 - save.up.fireRate * 1.2);
+    return buffs.rapid > 0 ? base * 0.45 : base;
+}
+function shoot() {
+    const w = WEAPONS[save.weapon];
+    const sp = 13 * VS;
+    const dmg = 1 + save.up.damage * 0.5;
+    for (const [ox, ang] of w.pattern) {
+        bullets.push({
+            x: player.x + ox * S, y: player.y - 44 * S,
+            vx: Math.sin(ang) * sp, vy: -Math.cos(ang) * sp,
+            r: (save.weapon === 'legend' ? 4.5 : 3.8) * S,
+            color: w.bullet, dmg, pierce: w.pierce || 0, hit: new Set()
+        });
+    }
+    recoil = 1;
+    sfx.shoot();
+}
+
+function useSkill(type) {
+    if (state !== 'playing') return;
+    const sk = skills[type];
+    if (sk.cd > 0) return;
+    sk.cd = cdMax(type);
+    if (type === 'shield') {
+        sk.active = sk.dur;
+        sfx.shield();
+        showMessage('🛡️ LÁ CHẮN XANH!', 1200);
+    } else {
+        waves.push({ x: player.x, y: player.y, r: 0, max: Math.hypot(W, H), life: 1 });
+        const list = trashes; trashes = [];
+        list.forEach(t => killTrash(t, true));
+        if (boss && boss.entered) hitBoss(boss.maxHp * 0.15);
+        shake = 16; whiteFlash = 0.6;
+        sfx.bomb();
+        showMessage('💥 SÓNG QUÉT SẠCH RÁC!', 1200);
+    }
+}
+
+function pickType() {
+    const pool = TRASH.filter(t => (t.minLevel || 1) <= level);
+    let r = Math.random() * pool.reduce((s, t) => s + t.weight, 0);
+    for (const t of pool) if ((r -= t.weight) <= 0) return t;
+    return pool[0];
+}
+function spawnTrash(x, y) {
+    const type = pickType();
+    const r = (type.big ? 34 : type.danger ? 25 : 22) * S;
+    let px = x !== undefined ? x : rand(r, W - r);
+    if (type.zig) px = clamp(px, r + 45 * S, W - r - 45 * S);
+    trashes.push({
+        type, r, x: px, bx: px, y: y !== undefined ? y : -r,
+        hp: type.hp, maxHp: type.hp,
+        vy: 1.5 * VS * type.speed * Math.min(2.4, 1 + (level - 1) * 0.07) * rand(0.88, 1.15),
+        phase: Math.random() * 6, rot: rand(-0.3, 0.3), vr: rand(-0.02, 0.02), flash: 0
+    });
+}
+function spawnFriend() {
+    const x = rand(60, W - 60);
+    friends.push({ x, bx: x, y: -30, vy: 1.15 * VS, phase: 0, r: 20 * S });
+}
+function spawnBoss() {
+    const n = level / 5;
+    boss = {
+        n, x: W / 2, y: -90 * S, ty: hudBottom + 110 + 60 * S, r: 60 * S,
+        hp: 50 + n * 45, maxHp: 50 + n * 45,
+        dir: 1, speed: (1.3 + n * 0.3) * VS, drop: 60, flash: 0, entered: false
+    };
+    shake = 10;
+    sfx.boss();
+    showMessage('⚠️ QUÁI VẬT RÁC XUẤT HIỆN!', 2200);
+}
+
+function addScore(p) {
+    score += p;
+    while (score >= threshold(level)) levelUp();
+    updateHUD();
+}
+function addCoins(c) { save.coins += c; runCoins += c; }
+function levelUp() {
+    level++;
+    sfx.level();
+    if (level % 5 === 0 && !boss) spawnBoss();
+    else showMessage(`🌳 CẤP ${level}!`, 1400);
+}
+
+function damageTrash(t, i, dmg) {
+    t.hp -= dmg;
+    t.flash = 6;
+    burst(t.x, t.y, t.type.color, 4, 3);
+    if (t.hp <= 0) { trashes.splice(i, 1); killTrash(t, false); }
+    else sfx.hit();
+}
+function killTrash(t, fromBomb) {
+    kills++;
+    killsByType[t.type.id] = (killsByType[t.type.id] || 0) + 1;
+    if (!fromBomb) {
+        combo++; comboTimer = 150; comboPulse = 1;
+        if (combo % 10 === 0) { sfx.combo(); addText(`COMBO ${combo}!`, t.x, t.y - 34 * S, '#FF80AB', 22); }
+    }
+    const pts = Math.round(t.type.pts * (fromBomb ? 1 : comboMult()));
+    const c = t.type.coin * (buffs.double > 0 ? 2 : 1);
+    addCoins(c);
+    addScore(pts);
+    burst(t.x, t.y, t.type.color, t.type.big ? 26 : 14);
+    addText(`+${pts}`, t.x, t.y - 8 * S, '#fff', 18);
+    addText(`+${c}🪙`, t.x, t.y + 14 * S, '#FFD54F', 14);
+    if (!fromBomb) sfx.kill();
+    if (!fromBomb && Math.random() < 0.07) dropPower(t.x, t.y);
+}
+function trashLanded(t) {
+    burst(t.x, groundY, '#795548', 10, 4);
+    if (skills.shield.active > 0) {
+        addText('Chặn!', t.x, groundY - 24 * S, '#81D4FA', 16);
+        burst(t.x, groundY - 6, '#4FC3F7', 8, 4);
+        return;
+    }
+    combo = 0;
+    loseLife(t.type.danger ? 2 : 1, t.x);
+}
+function loseLife(n, x) {
+    lives = Math.max(0, lives - n);
+    hurtFlash = 1; shake = 10;
+    addText(`-${n} ❤️`, x, groundY - 28 * S, '#FF5252', 20);
+    sfx.hurt();
+    updateHUD();
+    if (lives <= 0) endGame();
+}
+function hitBoss(dmg) {
+    boss.hp -= dmg;
+    boss.flash = 5;
+    sfx.hit();
+    if (boss.hp <= 0) {
+        const b = boss; boss = null;
+        for (let k = 0; k < 6; k++) burst(b.x + rand(-b.r, b.r), b.y + rand(-b.r, b.r), ['#FFD54F', '#FF7043', '#8D6E63'][k % 3], 22, 9);
+        shake = 24; whiteFlash = 0.8;
+        sfx.bomb(); sfx.level();
+        dropPower(b.x - 30, b.y); dropPower(b.x + 30, b.y);
+        const coinsWon = 60 + 40 * b.n;
+        addCoins(coinsWon);
+        addText(`+${coinsWon}🪙`, b.x, b.y + 30, '#FFD54F', 28);
+        showMessage('🎉 ĐÃ HẠ QUÁI VẬT RÁC!', 2200);
+        addScore(Math.round(300 * b.n));
+    }
+}
+function dropPower(x, y) {
+    const ks = Object.keys(POWERS);
+    let k = ks[Math.floor(Math.random() * ks.length)];
+    if (k === 'heal' && lives >= maxLives()) k = 'double';
+    powerups.push({ k, x, y, vy: 1.7 * VS, r: 18 * S, t: 0 });
+}
+function caughtByPlayer(o) {
+    return Math.abs(o.x - player.x) < 34 * S + o.r && Math.abs(o.y - player.y) < 26 * S + o.r;
+}
+
+/* =================== HIỆU ỨNG =================== */
+function burst(x, y, color, count = 12, power = 7) {
+    if (particles.length > 500) return;
+    for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2, v = Math.random() * power;
+        const life = rand(25, 50);
+        particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5, life, max: life, color, size: rand(2.5, 6) * S });
+    }
+}
+function addText(text, x, y, color = '#fff', size = 16) {
+    texts.push({ text, x, y, life: 55, max: 55, color, size });
+}
+let msgTimer = null;
+function showMessage(text, ms = 1600) {
+    const m = $('message');
+    m.textContent = text;
+    m.classList.remove('show'); void m.offsetWidth; m.classList.add('show');
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(() => m.classList.remove('show'), ms);
+}
+
+/* =================== UPDATE =================== */
+function update(dt) {
+    time += dt;
+    for (const k in buffs) if (buffs[k] > 0) buffs[k] = Math.max(0, buffs[k] - dt);
+    skills.shield.cd = Math.max(0, skills.shield.cd - dt);
+    skills.shield.active = Math.max(0, skills.shield.active - dt);
+    skills.bomb.cd = Math.max(0, skills.bomb.cd - dt);
+    if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
+    comboPulse = Math.max(0, comboPulse - dt * 0.08);
+    recoil = Math.max(0, recoil - dt * 0.25);
+    shake = Math.max(0, shake - dt * 0.9);
+    hurtFlash = Math.max(0, hurtFlash - dt * 0.04);
+    whiteFlash = Math.max(0, whiteFlash - dt * 0.05);
+    const slow = buffs.slow > 0 ? 0.4 : 1;
+
+    // Di chuyển
+    const spd = (6.5 + save.up.speed * 0.9) * VS;
+    let dx = 0;
+    if (keys.ArrowLeft || keys.KeyA) dx -= spd;
+    if (keys.ArrowRight || keys.KeyD) dx += spd;
+    if (dx === 0 && pointer.active) dx = clamp((pointer.x - player.x) * 0.3, -spd * 1.8, spd * 1.8);
+    player.x = clamp(player.x + dx * dt, 36 * S, W - 36 * S);
+    player.wheel += dx * dt * 0.06;
+
+    // Bắn
+    fireTimer -= dt;
+    if ((keys.Space || pointer.active || save.autoFire) && fireTimer <= 0) {
+        shoot();
+        fireTimer = fireInterval();
+    }
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.y < -30 || b.x < -30 || b.x > W + 30) bullets.splice(i, 1);
+    }
+
+    // Sinh rác / cây / boss
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+        spawnTrash();
+        spawnTimer = Math.max(15, 58 - level * 3.5) * (boss ? 2.4 : 1) * rand(0.75, 1.25);
+    }
+    friendTimer -= dt;
+    if (friendTimer <= 0) { spawnFriend(); friendTimer = rand(900, 1500); }
+
+    if (boss) {
+        if (!boss.entered) {
+            boss.y += 1.6 * dt;
+            if (boss.y >= boss.ty) boss.entered = true;
+        } else {
+            boss.x += boss.dir * boss.speed * dt * slow;
+            if (boss.x < boss.r + 10 || boss.x > W - boss.r - 10) { boss.dir *= -1; boss.x = clamp(boss.x, boss.r + 10, W - boss.r - 10); }
+            boss.y = boss.ty + Math.sin(time * 0.03) * 12 * S;
+            boss.drop -= dt * slow;
+            if (boss.drop <= 0) {
+                spawnTrash(clamp(boss.x + rand(-20, 20), 30, W - 30), boss.y + boss.r * 0.7);
+                boss.drop = Math.max(32, 80 - boss.n * 8);
+            }
+        }
+        if (boss.flash > 0) boss.flash -= dt;
+    }
+
+    // Rác rơi
+    for (let i = trashes.length - 1; i >= 0; i--) {
+        const t = trashes[i];
+        t.y += t.vy * slow * dt;
+        t.phase += 0.045 * dt * slow;
+        if (t.type.zig) t.x = t.bx + Math.sin(t.phase) * 45 * S;
+        t.rot += t.vr * dt * slow;
+        if (t.flash > 0) t.flash -= dt;
+        if (t.y + t.r * 0.6 >= groundY) {
+            trashes.splice(i, 1);
+            trashLanded(t);
+            if (state !== 'playing') return;
+        }
+    }
+
+    // Cây non
+    for (let i = friends.length - 1; i >= 0; i--) {
+        const f = friends[i];
+        f.y += f.vy * slow * dt; f.phase += 0.03 * dt;
+        f.x = f.bx + Math.sin(f.phase) * 30 * S;
+        if (caughtByPlayer(f)) {
+            friends.splice(i, 1);
+            const healed = lives < maxLives();
+            if (healed) lives++;
+            addScore(25);
+            addText(healed ? '+1 ❤️ Cảm ơn!' : '+25 🌱', f.x, f.y - 20, '#69F0AE', 20);
+            burst(f.x, f.y, '#69F0AE', 16);
+            sfx.power();
+            updateHUD();
+        } else if (f.y > groundY - 6) {
+            friends.splice(i, 1);
+            planted++;
+            addText('🌳 Đã trồng cây', f.x, groundY - 30, '#C8E6C9', 14);
+        }
+    }
+
+    // Vật phẩm
+    for (let i = powerups.length - 1; i >= 0; i--) {
+        const p = powerups[i];
+        p.y += p.vy * dt; p.t += dt;
+        if (caughtByPlayer(p)) {
+            powerups.splice(i, 1);
+            const P = POWERS[p.k];
+            if (p.k === 'heal') lives = Math.min(maxLives(), lives + 1);
+            else buffs[p.k] = P.dur;
+            addText(P.name, player.x, player.y - 60 * S, P.color, 20);
+            burst(p.x, p.y, P.color, 16);
+            sfx.power();
+            updateHUD();
+        } else if (p.y > groundY + 20) powerups.splice(i, 1);
+    }
+
+    // Va chạm đạn
+    for (let j = bullets.length - 1; j >= 0; j--) {
+        const b = bullets[j];
+        let remove = false;
+        if (boss && boss.entered && (b.x - boss.x) ** 2 + (b.y - boss.y) ** 2 < (boss.r + b.r) ** 2) {
+            burst(b.x, b.y, '#BCAAA4', 3, 3);
+            hitBoss(b.dmg);
+            remove = true;
+        } else {
+            for (let i = trashes.length - 1; i >= 0; i--) {
+                const t = trashes[i];
+                if (b.hit.has(t)) continue;
+                if ((b.x - t.x) ** 2 + (b.y - t.y) ** 2 < (t.r + b.r) ** 2) {
+                    b.hit.add(t);
+                    damageTrash(t, i, b.dmg);
+                    if (b.pierce > 0) b.pierce--; else remove = true;
+                    break;
+                }
+            }
+            if (!remove) {
+                for (let i = friends.length - 1; i >= 0; i--) {
+                    const f = friends[i];
+                    if ((b.x - f.x) ** 2 + (b.y - f.y) ** 2 < (f.r + b.r) ** 2) {
+                        friends.splice(i, 1);
+                        score = Math.max(0, score - 50);
+                        combo = 0;
+                        addText('-50 Đừng bắn cây! 😢', f.x, f.y, '#FF8A80', 18);
+                        burst(f.x, f.y, '#81C784', 14);
+                        sfx.bad(); shake = 6;
+                        updateHUD();
+                        remove = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (remove) bullets.splice(j, 1);
+    }
+}
+
+function updateEffects(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.vy += 0.2 * dt; p.vx *= 0.985;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (let i = texts.length - 1; i >= 0; i--) {
+        const t = texts[i];
+        t.y -= 0.9 * dt; t.life -= dt;
+        if (t.life <= 0) texts.splice(i, 1);
+    }
+    for (let i = waves.length - 1; i >= 0; i--) {
+        const w = waves[i];
+        w.r += 28 * dt; w.life = 1 - w.r / w.max;
+        if (w.life <= 0) waves.splice(i, 1);
+    }
+    for (const c of clouds) {
+        c.x += c.v * dt;
+        if (c.x - 80 * c.s > W) { c.x = -90 * c.s; c.y = rand(40, H * 0.32); }
+    }
+    const visible = state === 'start' ? trees.length : Math.min(trees.length, 3 + (level - 1) * 2 + planted);
+    trees.forEach((t, i) => {
+        const target = i < visible ? 1 : 0;
+        t.g += (target - t.g) * Math.min(1, 0.03 * dt);
+    });
+    const target = state === 'start' ? 0 : 1 - lives / maxLives();
+    pollution += (target - pollution) * Math.min(1, 0.03 * dt);
+}
+
+/* =================== VẼ =================== */
+function drawBackground() {
+    const p = pollution;
+    const sky = ctx.createLinearGradient(0, 0, 0, groundY);
+    sky.addColorStop(0, mix('#29B6F6', '#6b665a', p));
+    sky.addColorStop(0.6, mix('#B3E5FC', '#9e977f', p));
+    sky.addColorStop(1, mix('#E8F5E9', '#b3aa8c', p));
+    ctx.fillStyle = sky;
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+
+    // Mặt trời
+    const sx = W * 0.83, sy = H * 0.15, sr = 46 * S;
+    const glow = ctx.createRadialGradient(sx, sy, sr * 0.5, sx, sy, sr * 3);
+    glow.addColorStop(0, `rgba(255,241,118,${0.55 * (1 - p * 0.8)})`);
+    glow.addColorStop(1, 'rgba(255,241,118,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(sx - sr * 3, sy - sr * 3, sr * 6, sr * 6);
+    ctx.fillStyle = mix('#FFF176', '#c9b97a', p);
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+
+    // Mây
+    ctx.fillStyle = mix('#ffffff', '#8a8578', p);
+    for (const c of clouds) {
+        const k = c.s * S;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, 22 * k, 0, Math.PI * 2);
+        ctx.arc(c.x + 22 * k, c.y - 10 * k, 27 * k, 0, Math.PI * 2);
+        ctx.arc(c.x + 48 * k, c.y, 21 * k, 0, Math.PI * 2);
+        ctx.arc(c.x + 24 * k, c.y + 8 * k, 22 * k, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Đồi xa
+    drawHill(0, mix('#A5D6A7', '#a19f86', p));
+    // Đồi gần + cây
+    drawHill(1, mix('#66BB6A', '#8b8d5c', p));
+    for (const t of trees) if (t.g > 0.02) drawTree(t.x, hillY(t.x, 1) + 6 * S, t.s * S * t.g, p);
+
+    // Mặt đất
+    ctx.fillStyle = mix('#43A047', '#6e6b3c', p);
+    ctx.fillRect(-20, groundY, W + 40, H - groundY + 20);
+    ctx.fillStyle = mix('#2E7D32', '#575330', p);
+    ctx.fillRect(-20, groundY, W + 40, 5 * S);
+
+    // Khói bụi ô nhiễm
+    if (p > 0.02) {
+        ctx.fillStyle = `rgba(95,85,60,${p * 0.28})`;
+        ctx.fillRect(-20, -20, W + 40, H + 40);
+    }
+}
+function drawHill(layer, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-20, groundY + 2);
+    for (let x = -20; x <= W + 20; x += 16) ctx.lineTo(x, hillY(x, layer));
+    ctx.lineTo(W + 20, groundY + 2);
+    ctx.closePath();
+    ctx.fill();
+}
+function drawTree(x, y, k, p) {
+    ctx.fillStyle = '#6D4C41';
+    ctx.fillRect(x - 3 * k, y - 16 * k, 6 * k, 16 * k);
+    ctx.fillStyle = mix('#2E7D32', '#5f6b3a', p);
+    ctx.beginPath(); ctx.arc(x, y - 26 * k, 13 * k, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = mix('#388E3C', '#6b7444', p);
+    ctx.beginPath();
+    ctx.arc(x - 9 * k, y - 19 * k, 9 * k, 0, Math.PI * 2);
+    ctx.arc(x + 9 * k, y - 19 * k, 9 * k, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(165,214,167,.7)';
+    ctx.beginPath(); ctx.arc(x - 4 * k, y - 31 * k, 4.5 * k, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawPlayer() {
+    const w = WEAPONS[save.weapon];
+    const x = player.x, y = player.y, k = S;
+
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    ctx.beginPath(); ctx.ellipse(x, groundY + 2, 36 * k, 6 * k, 0, 0, Math.PI * 2); ctx.fill();
+
+    if (save.weapon === 'legend' || buffs.rapid > 0) {
+        const a = 0.25 + Math.sin(time * 0.15) * 0.12;
+        ctx.fillStyle = buffs.rapid > 0 ? `rgba(255,235,59,${a})` : `rgba(255,213,79,${a})`;
+        ctx.beginPath(); ctx.arc(x, y - 10 * k, 52 * k, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Nòng súng
+    const rc = recoil * 5 * k;
+    ctx.fillStyle = w.cannon;
+    ctx.beginPath(); ctx.roundRect(x - 7 * k, y - 46 * k + rc, 14 * k, 32 * k, 4 * k); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.fillRect(x - 7 * k, y - 46 * k + rc, 14 * k, 4 * k);
+    if (save.weapon === 'plasma' || save.weapon === 'legend') {
+        ctx.fillStyle = w.cannon;
+        ctx.beginPath();
+        ctx.roundRect(x - 17 * k, y - 36 * k + rc, 7 * k, 20 * k, 3 * k);
+        ctx.roundRect(x + 10 * k, y - 36 * k + rc, 7 * k, 20 * k, 3 * k);
+        ctx.fill();
+    }
+
+    // Vòm
+    ctx.fillStyle = w.cannon;
+    ctx.beginPath(); ctx.arc(x, y - 14 * k, 17 * k, Math.PI, 0); ctx.fill();
+
+    // Thân
+    const g = ctx.createLinearGradient(0, y - 18 * k, 0, y + 14 * k);
+    g.addColorStop(0, mix(w.body, '#ffffff', 0.25));
+    g.addColorStop(1, w.body);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.roundRect(x - 34 * k, y - 16 * k, 68 * k, 30 * k, 10 * k); ctx.fill();
+    drawEmoji('♻️', x, y - 1 * k, 19 * k);
+
+    // Bánh xe
+    for (const ox of [-22, 22]) {
+        const wx = x + ox * k, wy = y + 14 * k;
+        ctx.fillStyle = '#263238';
+        ctx.beginPath(); ctx.arc(wx, wy, 9.5 * k, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#90A4AE'; ctx.lineWidth = 2 * k;
+        ctx.beginPath();
+        for (let s = 0; s < 3; s++) {
+            const a = player.wheel + s * Math.PI / 3;
+            ctx.moveTo(wx - Math.cos(a) * 6 * k, wy - Math.sin(a) * 6 * k);
+            ctx.lineTo(wx + Math.cos(a) * 6 * k, wy + Math.sin(a) * 6 * k);
+        }
+        ctx.stroke();
+    }
+
+    if (skills.shield.active > 0) {
+        const a = skills.shield.active < 60 && Math.floor(time / 6) % 2 ? 0.15 : 0.35;
+        ctx.strokeStyle = `rgba(129,212,250,${a + 0.4})`; ctx.lineWidth = 3;
+        ctx.fillStyle = `rgba(79,195,247,${a * 0.5})`;
+        ctx.beginPath(); ctx.arc(x, y - 6 * k, 50 * k, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+}
+
+function drawShieldBarrier() {
+    if (skills.shield.active <= 0) return;
+    const blink = skills.shield.active < 60 && Math.floor(time / 6) % 2;
+    const g = ctx.createLinearGradient(0, groundY - 40 * S, 0, groundY);
+    g.addColorStop(0, 'rgba(79,195,247,0)');
+    g.addColorStop(1, blink ? 'rgba(79,195,247,.2)' : 'rgba(79,195,247,.5)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, groundY - 40 * S, W, 40 * S);
+    ctx.strokeStyle = blink ? 'rgba(179,229,252,.4)' : 'rgba(179,229,252,.95)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 12) ctx.lineTo(x, groundY - 4 + Math.sin(x * 0.05 + time * 0.2) * 3);
+    ctx.stroke();
+}
+
+function drawTrash(t) {
+    const pulse = Math.sin(time * 0.2 + t.phase);
+    ctx.fillStyle = t.type.color;
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 1.05, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 0.82, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    if (t.type.danger) {
+        ctx.strokeStyle = `rgba(255,82,82,${0.55 + pulse * 0.4})`;
+        ctx.lineWidth = 3 * S;
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.r + 4 * S, 0, Math.PI * 2); ctx.stroke();
+    }
+    drawEmoji(t.type.emoji, t.x, t.y, t.r * 1.3, t.rot);
+    if (t.flash > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${t.flash / 6 * 0.75})`;
+        ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 0.9, 0, Math.PI * 2); ctx.fill();
+    }
+    if (t.maxHp > 1 && t.hp < t.maxHp) {
+        const bw = t.r * 1.6, by = t.y + t.r + 5 * S;
+        ctx.fillStyle = 'rgba(0,0,0,.5)';
+        ctx.fillRect(t.x - bw / 2, by, bw, 4 * S);
+        ctx.fillStyle = '#69F0AE';
+        ctx.fillRect(t.x - bw / 2, by, bw * Math.max(0, t.hp / t.maxHp), 4 * S);
+    }
+}
+
+function drawBoss() {
+    const b = boss, k = S;
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.15, 0, Math.PI * 2); ctx.fill();
+    const g = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+    g.addColorStop(0, '#6D4C41'); g.addColorStop(1, '#2b1d18');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    drawEmoji('🗑️', b.x, b.y + 8 * k, b.r * 1.25, Math.sin(time * 0.05) * 0.1);
+    // Mắt giận dữ
+    for (const s of [-1, 1]) {
+        const ex = b.x + s * b.r * 0.38, ey = b.y - b.r * 0.42;
+        ctx.fillStyle = '#FF1744';
+        ctx.beginPath(); ctx.ellipse(ex, ey, 9 * k, 7 * k, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#1a0f0c'; ctx.lineWidth = 4 * k;
+        ctx.beginPath(); ctx.moveTo(ex - s * 12 * k, ey - 14 * k); ctx.lineTo(ex + s * 8 * k, ey - 6 * k); ctx.stroke();
+    }
+    if (b.flash > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${b.flash / 5 * 0.6})`;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    }
+    // Thanh máu
+    const bw = Math.min(440, W * 0.7), bx = (W - bw) / 2, by = hudBottom + 30;
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.beginPath(); ctx.roundRect(bx - 4, by - 4, bw + 8, 20, 10); ctx.fill();
+    const hg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    hg.addColorStop(0, '#FF5252'); hg.addColorStop(1, '#FF9100');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.roundRect(bx, by, bw * Math.max(0, b.hp / b.maxHp), 12, 6); ctx.fill();
+    ctx.font = `800 ${14}px 'Baloo 2', sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('👹 QUÁI VẬT RÁC', W / 2, by - 6);
+}
+
+function drawBullets() {
+    ctx.lineCap = 'round';
+    for (const b of bullets) {
+        ctx.strokeStyle = b.color;
+        ctx.globalAlpha = 0.35; ctx.lineWidth = b.r * 3.2;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 1.4, b.y - b.vy * 1.4); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.lineWidth = b.r * 1.7;
+        ctx.stroke();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = b.r * 0.7;
+        ctx.stroke();
+    }
+}
+
+function drawHUDCanvas() {
+    // Combo
+    if (combo >= 3) {
+        const sc = 1 + comboPulse * 0.25;
+        ctx.save();
+        ctx.translate(W / 2, hudBottom + (boss ? 72 : 30));
+        ctx.scale(sc, sc);
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `800 ${26 * S}px 'Baloo 2', sans-serif`;
+        ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.45)';
+        const label = `🔥 COMBO ${combo}  ×${comboMult().toFixed(1)}`;
+        ctx.strokeText(label, 0, 0);
+        ctx.fillStyle = combo >= 40 ? '#FF4081' : combo >= 20 ? '#FFAB40' : '#FFF59D';
+        ctx.fillText(label, 0, 0);
+        ctx.fillStyle = 'rgba(255,255,255,.7)';
+        ctx.fillRect(-60 * S, 18 * S, 120 * S * (comboTimer / 150), 3 * S);
+        ctx.restore();
+    }
+    // Buff đang có
+    const list = [];
+    for (const k in buffs) if (buffs[k] > 0) list.push([POWERS[k].emoji, buffs[k] / POWERS[k].dur, POWERS[k].color]);
+    if (skills.shield.active > 0) list.push(['🛡️', skills.shield.active / skills.shield.dur, '#81D4FA']);
+    list.forEach(([e, f, c], i) => {
+        const bx = 14 + i * 52, by = groundY - 62 * S;
+        ctx.fillStyle = 'rgba(14,34,24,.7)';
+        ctx.beginPath(); ctx.roundRect(bx, by, 46, 46, 10); ctx.fill();
+        drawEmoji(e, bx + 23, by + 20, 22);
+        ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(bx + 6, by + 37, 34, 4);
+        ctx.fillStyle = c; ctx.fillRect(bx + 6, by + 37, 34 * f, 4);
+    });
+}
+
+function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate(rand(-shake, shake), rand(-shake, shake));
+    drawBackground();
+
+    if (state !== 'start') {
+        drawShieldBarrier();
+        for (const f of friends) {
+            ctx.fillStyle = 'rgba(105,240,174,.28)';
+            ctx.beginPath(); ctx.arc(f.x, f.y, f.r * 1.15, 0, Math.PI * 2); ctx.fill();
+            drawEmoji('🌱', f.x, f.y, f.r * 1.4, Math.sin(f.phase) * 0.25);
+        }
+        for (const p of powerups) {
+            const P = POWERS[p.k], bob = Math.sin(p.t * 0.15) * 3;
+            ctx.fillStyle = P.color; ctx.globalAlpha = 0.35 + Math.sin(p.t * 0.2) * 0.15;
+            ctx.beginPath(); ctx.arc(p.x, p.y + bob, p.r * 1.3, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(p.x, p.y + bob, p.r, 0, Math.PI * 2); ctx.stroke();
+            drawEmoji(P.emoji, p.x, p.y + bob, p.r * 1.2);
+        }
+        for (const t of trashes) drawTrash(t);
+        if (boss) drawBoss();
+        drawBullets();
+        drawPlayer();
+    }
+
+    for (const p of particles) {
+        ctx.globalAlpha = Math.max(0, p.life / p.max);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * p.life / p.max), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const w of waves) {
+        ctx.strokeStyle = `rgba(179,229,252,${w.life})`;
+        ctx.lineWidth = 14 * w.life + 2;
+        ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const t of texts) {
+        ctx.globalAlpha = Math.min(1, t.life / 20);
+        ctx.font = `800 ${t.size * S}px 'Baloo 2', sans-serif`;
+        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.5)';
+        ctx.strokeText(t.text, t.x, t.y);
+        ctx.fillStyle = t.color;
+        ctx.fillText(t.text, t.x, t.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    if (state !== 'start') drawHUDCanvas();
+
+    if (hurtFlash > 0) {
+        const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
+        g.addColorStop(0, 'rgba(255,0,0,0)');
+        g.addColorStop(1, `rgba(255,23,68,${hurtFlash * 0.55})`);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    if (whiteFlash > 0) {
+        ctx.fillStyle = `rgba(255,255,255,${whiteFlash * 0.6})`;
+        ctx.fillRect(0, 0, W, H);
+    }
+}
+
+/* =================== HUD (HTML) =================== */
+const skillEls = {
+    shield: { btn: $('skill-shield'), cd: $('skill-shield').querySelector('.cd') },
+    bomb:   { btn: $('skill-bomb'),   cd: $('skill-bomb').querySelector('.cd') },
+};
+function updateHUD() {
+    $('score').textContent = score.toLocaleString('vi-VN');
+    $('coins').textContent = save.coins.toLocaleString('vi-VN');
+    $('level').textContent = level;
+    const prev = level > 1 ? threshold(level - 1) : 0, next = threshold(level);
+    $('level-bar').style.width = clamp((score - prev) / (next - prev) * 100, 0, 100) + '%';
+    const m = maxLives();
+    $('lives').textContent = W < 640 ? `❤️ ${lives}/${m}` : '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, m - lives));
+    hudBottom = $('hud').getBoundingClientRect().bottom;
+    $('btn-mute').textContent = save.muted ? '🔇' : '🔊';
+    $('btn-auto').classList.toggle('on', save.autoFire);
+}
+function updateSkillUI() {
+    for (const k in skillEls) {
+        const sk = skills[k], el = skillEls[k];
+        const p = sk.cd > 0 ? clamp(sk.cd / cdMax(k), 0, 1) : 0;
+        el.cd.style.setProperty('--p', p);
+        const txt = sk.cd > 0 ? String(Math.ceil(sk.cd / 60)) : '';
+        if (el.cd.textContent !== txt) el.cd.textContent = txt;
+        el.btn.classList.toggle('ready', sk.cd <= 0 && state === 'playing');
+    }
+}
+let hintTimer = null;
+function showControlsHint() {
+    const c = $('controls');
+    c.style.opacity = '1';
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => c.style.opacity = '0', 9000);
+}
+function toggleMute() { save.muted = !save.muted; persist(); updateHUD(); }
+function toggleAuto() {
+    save.autoFire = !save.autoFire; persist(); updateHUD();
+    if (state === 'playing') showMessage(save.autoFire ? '🎯 Tự động bắn: BẬT' : '🎯 Tự động bắn: TẮT', 1000);
+}
+
+/* =================== VÒNG LẶP =================== */
+let last = performance.now();
+function loop(now) {
+    const dt = Math.min(3, (now - last) / 16.667);
+    last = now;
+    if (state === 'playing') update(dt);
+    if (state === 'playing' || state === 'start' || state === 'gameover') updateEffects(dt);
+    draw();
+    updateSkillUI();
+    const menu = state === 'start' || (state === 'shop' && shopReturn === 'start');
+    if (document.body.classList.contains('menu') !== menu) document.body.classList.toggle('menu', menu);
+    requestAnimationFrame(loop);
+}
+
+/* =================== ĐIỀU KHIỂN =================== */
+addEventListener('keydown', e => {
+    if (['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+    keys[e.code] = true;
+    if (e.repeat) return;
+    ensureAudio();
+    switch (e.code) {
+        case 'KeyJ': useSkill('shield'); break;
+        case 'KeyK': useSkill('bomb'); break;
+        case 'KeyB': state === 'shop' ? closeShop() : openShop(); break;
+        case 'KeyP': case 'Escape':
+            if (state === 'shop') closeShop();
+            else togglePause();
+            break;
+        case 'KeyM': toggleMute(); break;
+        case 'KeyF': toggleAuto(); break;
+        case 'Enter': if (state === 'start' || state === 'gameover') startGame(); break;
+    }
+});
+addEventListener('keyup', e => {
+    keys[e.code] = false;
+    if (e.code === 'Space') e.preventDefault();
+});
+addEventListener('blur', () => {
+    for (const k in keys) keys[k] = false;
+    if (state === 'playing') togglePause();
+});
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { persist(); if (state === 'playing') togglePause(); }
+});
+addEventListener('beforeunload', persist);
+addEventListener('resize', resize);
+
+canvas.addEventListener('pointerdown', e => {
+    ensureAudio();
+    if (state !== 'playing') return;
+    pointer.active = true; pointer.x = e.clientX;
+    canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => { if (pointer.active) pointer.x = e.clientX; });
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => canvas.addEventListener(ev, () => pointer.active = false));
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Bỏ focus khỏi nút sau khi bấm, để phím SPACE không kích hoạt lại nút
+document.addEventListener('click', e => { const b = e.target.closest('button'); if (b) b.blur(); });
+
+$('btn-start').onclick = startGame;
+$('btn-retry').onclick = startGame;
+$('btn-start-shop').onclick = openShop;
+$('btn-go-shop').onclick = openShop;
+$('btn-pause-shop').onclick = openShop;
+$('btn-close-shop').onclick = closeShop;
+$('btn-resume').onclick = togglePause;
+$('btn-shop').onclick = () => { if (state === 'playing' || state === 'paused') openShop(); };
+$('btn-pause').onclick = togglePause;
+$('btn-mute').onclick = () => { ensureAudio(); toggleMute(); };
+$('btn-auto').onclick = toggleAuto;
+$('skill-shield').onclick = () => useSkill('shield');
+$('skill-bomb').onclick = () => useSkill('bomb');
+
+const hint = isTouch
+    ? 'Chạm & kéo để di chuyển (tự bắn khi chạm) · Nút kỹ năng ở góc phải dưới'
+    : '← → / A D: Di chuyển · Giữ SPACE hoặc chuột: Bắn · F: Tự bắn · J / K: Kỹ năng · B: Shop · P: Tạm dừng · M: Âm thanh';
+$('controls').textContent = hint;
+$('keys-hint').textContent = hint;
+$('best-start').textContent = save.best.toLocaleString('vi-VN');
+
+resize();
+updateHUD();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
